@@ -82,3 +82,26 @@ CREATE POLICY "Users can update their own comments"
   ON public.comments FOR UPDATE
   USING (auth.uid() = user_id);
 
+ALTER TABLE issues 
+    ADD CONSTRAINT fk_user_id 
+    FOREIGN KEY (user_id) 
+    REFERENCES profiles(user_id);
+
+ALTER TABLE issues 
+    ADD CONSTRAINT fk_resolved_by 
+    FOREIGN KEY (resolved_by) 
+    REFERENCES profiles(user_id);
+
+
+CREATE POLICY "Admins can update issues"
+ON public.issues
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE profiles.user_id = auth.uid()
+      AND profiles.is_admin = true
+  )
+);
+UPDATE profiles SET is_admin = true WHERE user_id = 'your-admin-user-id';

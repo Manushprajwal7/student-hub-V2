@@ -32,6 +32,7 @@ export function ProfileCard() {
   const [isUploading, setIsUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newFullName, setNewFullName] = useState("");
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     async function loadProfile() {
@@ -184,9 +185,15 @@ export function ProfileCard() {
           <div className="relative">
             <Avatar className="h-32 w-32 border-4 border-primary/10">
               <AvatarImage src={avatarUrl} alt={fullName} />
+
               <AvatarFallback className="text-2xl">
                 {fullName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
+              <img
+                src={profile?.avatar_url || "/default-avatar.png"}
+                alt="Profile"
+                className="w-20 h-20 rounded-full object-cover"
+              />
             </Avatar>
             <div className="absolute -bottom-2 -right-2">
               <input
@@ -255,6 +262,7 @@ export function ProfileCard() {
             </div>
             <div className="flex flex-col items-center gap-2 pt-4 border-t">
               <p className="text-base font-medium">{user?.email}</p>
+              {isAdmin && <p variant="success">Admin</p>}
               <p className="text-sm text-muted-foreground">
                 Member since {memberSince}
               </p>

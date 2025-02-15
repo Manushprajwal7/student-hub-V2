@@ -11,15 +11,51 @@ interface AuthContextType {
   signIn: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   isLoading: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const checkIsAdmin = (email: string): boolean => {
+  try {
+    if (!process.env.NEXT_PUBLIC_ADMIN_EMAILS) {
+      console.error("NEXT_PUBLIC_ADMIN_EMAILS is not defined in .env file.");
+      return false;
+    }
+    const adminEmails = JSON.parse(process.env.NEXT_PUBLIC_ADMIN_EMAILS);
+    if (!Array.isArray(adminEmails)) {
+      console.error("NEXT_PUBLIC_ADMIN_EMAILS is not a valid JSON array.");
+      return false;
+    }
+    return adminEmails.includes(email.toLowerCase());
+  } catch (error) {
+    console.error("Error parsing admin emails:", error);
+    return false;
+  }
+};
+
+// Helper function to update the admin flag in the Supabase profiles table.
+const updateAdminFlag = async (
+  supabase: ReturnType<typeof createClientComponentClient>,
+  userId: string,
+  isAdmin: boolean
+) => {
+  try {
+    await supabase
+      .from("profiles")
+      .update({ is_admin: isAdmin })
+      .eq("user_id", userId);
+  } catch (error) {
+    console.error("Error updating admin flag in profile:", error);
+  }
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState({
     user: null as User | null,
     session: null as Session | null,
     isLoading: true,
+    isAdmin: false,
   });
 
   const router = useRouter();
@@ -28,17 +64,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        let {
+        const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
 
         if (error) throw error;
 
+        const isAdmin = session?.user?.email
+          ? checkIsAdmin(session.user.email)
+          : false;
+
+        // If the user is admin, update their profile accordingly.
+        if (session?.user && isAdmin) {
+          await updateAdminFlag(supabase, session.user.id, true);
+        }
+
         setState({
           session,
           user: session?.user ?? null,
           isLoading: false,
+          isAdmin,
         });
       } catch (error) {
         console.error("Auth initialization error:", error);
@@ -46,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user: null,
           session: null,
           isLoading: false,
+          isAdmin: false,
         });
       }
     };
@@ -55,11 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const isAdmin = session?.user?.email
+        ? checkIsAdmin(session.user.email)
+        : false;
+
+      // Update the profile's admin flag on auth state change if needed.
+      if (session?.user && isAdmin) {
+        await updateAdminFlag(supabase, session.user.id, true);
+      }
+
       setState({
         session,
         user: session?.user ?? null,
         isLoading: false,
+        isAdmin,
       });
+
+      console.log("Admin Check Updated:", isAdmin);
     });
 
     return () => {
@@ -75,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error && error.message === "Invalid login credentials") {
-        // If login fails, sign up the user
+        // If login fails, sign up the user.
         const { data: signUpData, error: signUpError } =
           await supabase.auth.signUp({
             email,
@@ -85,7 +144,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (signUpError) throw new Error(signUpError.message);
         if (!signUpData.user) throw new Error("User registration failed.");
 
-        // Insert or update user profile after signing up
+        const isAdmin = checkIsAdmin(email);
+
+        // Upsert the user profile including the admin flag if applicable.
         const { error: upsertError } = await supabase.from("profiles").upsert(
           {
             user_id: signUpData.user.id,
@@ -93,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
               fullName
             )}`,
+            is_admin: isAdmin,
           },
           { onConflict: "user_id" }
         );
@@ -105,16 +167,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.session) {
-        // Update profile for existing users if needed
+        // Update profile for existing users if needed.
+        const isAdmin = checkIsAdmin(email);
         const { error: profileError } = await supabase.from("profiles").upsert(
           {
             user_id: data.session.user.id,
             full_name: fullName,
+            is_admin: isAdmin,
           },
           { onConflict: "user_id" }
         );
 
         if (profileError) throw profileError;
+
+        if (isAdmin) {
+          await updateAdminFlag(supabase, data.session.user.id, true);
+        }
+
+        setState((prev) => ({
+          ...prev,
+          isAdmin,
+        }));
 
         router.refresh();
         router.push("/");
@@ -134,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: null,
         session: null,
         isLoading: false,
+        isAdmin: false,
       });
 
       router.refresh();
