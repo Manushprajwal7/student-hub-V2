@@ -34,7 +34,6 @@ const checkIsAdmin = (email: string): boolean => {
   }
 };
 
-// Helper function to update the admin flag in the Supabase profiles table.
 const updateAdminFlag = async (
   supabase: ReturnType<typeof createClientComponentClient>,
   userId: string,
@@ -75,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? checkIsAdmin(session.user.email)
           : false;
 
-        // If the user is admin, update their profile accordingly.
         if (session?.user && isAdmin) {
           await updateAdminFlag(supabase, session.user.id, true);
         }
@@ -106,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ? checkIsAdmin(session.user.email)
         : false;
 
-      // Update the profile's admin flag on auth state change if needed.
       if (session?.user && isAdmin) {
         await updateAdminFlag(supabase, session.user.id, true);
       }
@@ -117,8 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         isAdmin,
       });
-
-      console.log("Admin Check Updated:", isAdmin);
     });
 
     return () => {
@@ -128,51 +123,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string, fullName: string) => {
     try {
+      // First try to sign in
       let { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error && error.message === "Invalid login credentials") {
-        // If login fails, sign up the user.
-        const { data: signUpData, error: signUpError } =
-          await supabase.auth.signUp({
-            email,
-            password,
-          });
+      if (error) {
+        if (error.message === "Invalid login credentials") {
+          // If login fails, attempt to sign up
+          const { data: signUpData, error: signUpError } =
+            await supabase.auth.signUp({
+              email,
+              password,
+            });
 
-        if (signUpError) throw new Error(signUpError.message);
-        if (!signUpData.user) throw new Error("User registration failed.");
+          if (signUpError) {
+            if (signUpError.message.includes("already registered")) {
+              throw new Error("Incorrect email or password");
+            }
+            throw signUpError;
+          }
 
-        const isAdmin = checkIsAdmin(email);
-
-        // Upsert the user profile including the admin flag if applicable.
-        const { error: upsertError } = await supabase.from("profiles").upsert(
-          {
-            user_id: signUpData.user.id,
-            full_name: fullName,
-            avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
-              fullName
-            )}`,
-            is_admin: isAdmin,
-          },
-          { onConflict: "user_id" }
-        );
-
-        if (upsertError) throw upsertError;
-
-        throw new Error(
-          "A confirmation email has been sent. Please verify your email before logging in."
-        );
+          data = signUpData; // Use the signup data for the rest of the flow
+        } else {
+          throw error;
+        }
       }
 
       if (data.session) {
-        // Update profile for existing users if needed.
         const isAdmin = checkIsAdmin(email);
+
+        // Update profile
         const { error: profileError } = await supabase.from("profiles").upsert(
           {
             user_id: data.session.user.id,
             full_name: fullName,
+            avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+              fullName
+            )}`,
             is_admin: isAdmin,
           },
           { onConflict: "user_id" }
@@ -190,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
 
         router.refresh();
-        router.push("/");
+        router.push("/"); // Redirect to home on success
       }
     } catch (error) {
       console.error("Sign in error:", error);

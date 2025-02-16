@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react"; // Import Eye icons
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,9 +25,8 @@ const formSchema = z.object({
 });
 
 export function AuthForm() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // Password visibility state
   const { signIn } = useAuth();
   const { toast } = useToast();
 
@@ -46,7 +44,6 @@ export function AuthForm() {
 
     try {
       await signIn(values.email, values.password, values.fullName);
-      router.push("/");
     } catch (error) {
       let errorMessage = "Something went wrong. Please try again.";
 
@@ -108,23 +105,21 @@ export function AuthForm() {
               <FormControl>
                 <div className="relative">
                   <Input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? "text" : "password"} // Toggle input type
                     placeholder="Enter your password"
                     {...field}
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
+                      <EyeOff className="h-4 w-4" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4" />
                     )}
-                  </Button>
+                  </button>
                 </div>
               </FormControl>
               <FormMessage />
