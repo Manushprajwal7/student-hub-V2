@@ -1,5 +1,5 @@
 "use client";
-
+import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -18,13 +18,25 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import type { IssueWithUser } from "@/types/issues";
-
+import { AlertTriangle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 interface IssueCardProps {
   issue: IssueWithUser;
   currentUserId?: string;
   onVote: () => void;
 }
-
+interface IssueWithUser {
+  // ... existing properties
+  reports: string[];
+  resolved: boolean;
+}
 const categoryColors = {
   Teaching:
     "bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-300",
@@ -51,7 +63,10 @@ const categoryColors = {
 
 export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
   const [isVoting, setIsVoting] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
   const { toast } = useToast();
+  const REPORT_THRESHOLD = 4;
+
   const initials =
     issue.user?.full_name
       ?.split(" ")
@@ -65,7 +80,56 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
   const hasDownvoted = currentUserId
     ? issue.downvotes.includes(currentUserId)
     : false;
+  const hasBeenReported = (issue.reports?.length || 0) >= REPORT_THRESHOLD;
+  const hasReported = currentUserId
+    ? issue.reports?.includes(currentUserId)
+    : false;
 
+  const handleReport = async () => {
+    if (!currentUserId) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please sign in to report issues.",
+      });
+      return;
+    }
+
+    try {
+      setIsReporting(true);
+      const updatedReports = issue.reports.includes(currentUserId)
+        ? issue.reports.filter((id) => id !== currentUserId)
+        : [...issue.reports, currentUserId];
+
+      const { error } = await supabase
+        .from("issues")
+        .update({
+          reports: updatedReports,
+        })
+        .eq("id", issue.id);
+
+      if (error) throw error;
+
+      // Call onVote to refresh the issues list
+      onVote();
+
+      toast({
+        title: "Success",
+        description: reports.includes(currentUserId)
+          ? "Report removed successfully."
+          : "Issue reported successfully.",
+      });
+    } catch (error) {
+      console.error("Error reporting:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to report issue. Please try again.",
+      });
+    } finally {
+      setIsReporting(false);
+    }
+  };
   const handleVote = async (voteType: "up" | "down") => {
     if (!currentUserId) {
       toast({
@@ -123,29 +187,38 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
       setIsVoting(false);
     }
   };
-
   useEffect(() => {
-    console.log("Issue data in card:", issue); // Debug log
-  }, [issue]);
+    console.log(`Issue ${issue.id} report status:`, {
+      reports: issue.reports,
+      hasBeenReported,
+      hasReported,
+    });
+  }, [issue.id, issue.reports, hasBeenReported, hasReported]);
 
   return (
     <Card
       className={cn(
         "transition-colors duration-200",
         issue.resolved && "border-green-500 bg-green-50 dark:bg-green-900/10",
-        !issue.resolved &&
-          issue.reports?.length > 0 &&
+        hasBeenReported &&
+          !issue.resolved &&
           "border-red-500 bg-red-50 dark:bg-red-900/10",
-        !issue.resolved && "hover:border-gray-300 dark:hover:border-gray-600"
+        !issue.resolved &&
+          !hasBeenReported &&
+          "hover:border-gray-300 dark:hover:border-gray-600"
       )}
     >
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
             <CardTitle className="line-clamp-2">
-              <Link href={`/issues/${issue.id}`} className="hover:underline">
-                {issue.title}
-              </Link>
+              {hasBeenReported ? (
+                <span className="text-muted-foreground">{issue.title}</span>
+              ) : (
+                <Link href={`/issues/${issue.id}`} className="hover:underline">
+                  {issue.title}
+                </Link>
+              )}
             </CardTitle>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge className={categoryColors[issue.category]}>
@@ -156,8 +229,14 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
                   Resolved
                 </Badge>
               )}
-              {issue.reports?.length > 0 && !issue.resolved && (
-                <Badge variant="destructive">Reported</Badge>
+              {hasBeenReported && !issue.resolved && (
+                <Badge
+                  variant="destructive"
+                  className="flex items-center gap-1"
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  Reported Issue
+                </Badge>
               )}
             </div>
             <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -173,6 +252,50 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
               <span>{formatDistanceToNow(new Date(issue.created_at))} ago</span>
             </div>
           </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "text-muted-foreground hover:text-foreground",
+                  hasReported && "text-red-600"
+                )}
+                disabled={isReporting}
+              >
+                {isReporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Report Issue</DialogTitle>
+                <DialogDescription>
+                  {hasReported
+                    ? "Do you want to remove your report from this issue?"
+                    : "Are you sure you want to report this issue? This action cannot be undone."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-4">
+                <Button
+                  variant={hasReported ? "destructive" : "default"}
+                  onClick={handleReport}
+                  disabled={isReporting}
+                >
+                  {isReporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : hasReported ? (
+                    "Remove Report"
+                  ) : (
+                    "Report Issue"
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardHeader>
       <CardContent>
@@ -198,6 +321,13 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
             </p>
           </div>
         )}
+        {hasBeenReported && !issue.resolved && (
+          <div className="mt-4 rounded-md bg-red-100 p-2 dark:bg-red-900/20">
+            <p className="text-sm text-red-700 dark:text-red-300">
+              ⚠️ This issue has been reported multiple times and is under review
+            </p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex items-center gap-4">
         <div className="flex items-center gap-2">
@@ -206,10 +336,11 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
             size="icon"
             className={cn(
               hasUpvoted && "text-green-600",
-              issue.resolved && "opacity-50 cursor-not-allowed"
+              (issue.resolved || hasBeenReported) &&
+                "opacity-50 cursor-not-allowed"
             )}
             onClick={() => handleVote("up")}
-            disabled={isVoting || issue.resolved}
+            disabled={isVoting || issue.resolved || hasBeenReported}
           >
             <ArrowBigUp className="h-5 w-5" />
           </Button>
@@ -221,15 +352,21 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
             size="icon"
             className={cn(
               hasDownvoted && "text-red-600",
-              issue.resolved && "opacity-50 cursor-not-allowed"
+              (issue.resolved || hasBeenReported) &&
+                "opacity-50 cursor-not-allowed"
             )}
             onClick={() => handleVote("down")}
-            disabled={isVoting || issue.resolved}
+            disabled={isVoting || issue.resolved || hasBeenReported}
           >
             <ArrowBigDown className="h-5 w-5" />
           </Button>
         </div>
-        <Button variant="ghost" size="sm" asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          className={cn(hasBeenReported && "pointer-events-none opacity-50")}
+        >
           <Link href={`/issues/${issue.id}`}>
             <MessageSquare className="mr-2 h-4 w-4" />
             Discuss

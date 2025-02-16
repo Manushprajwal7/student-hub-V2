@@ -1,5 +1,5 @@
 "use client";
-import { ProfileCard } from "@/components/profile/profile-card";
+import ProfileCard from "@/components/profile/profile-card";
 
 import { useState } from "react";
 import { useTheme } from "next-themes";

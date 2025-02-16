@@ -55,6 +55,8 @@ CREATE INDEX idx_comments_parent_id ON public.comments(parent_id);
 -- Enable RLS
 ALTER TABLE public.issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE issues
+ADD COLUMN IF NOT EXISTS reports text[] DEFAULT '{}';
 
 -- Create policies for issues
 CREATE POLICY "Issues are viewable by everyone"

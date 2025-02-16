@@ -1,13 +1,10 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   CameraIcon,
   Loader2,
   PencilIcon,
   CheckIcon,
   XIcon,
-  User,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,15 +21,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/types/profile";
 
-export function ProfileCard() {
-  const { user } = useAuth();
+const ProfileCard = () => {
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newFullName, setNewFullName] = useState("");
-  const { isAdmin } = useAuth();
 
   useEffect(() => {
     async function loadProfile() {
@@ -42,50 +38,77 @@ export function ProfileCard() {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("full_name, avatar_url, created_at")
+          .select("*")
           .eq("user_id", user.id)
           .single();
 
-        if (error) {
-          console.error("Error fetching profile:", error);
-          return;
-        }
+        if (error) throw error;
 
         setProfile(data);
         setNewFullName(data.full_name || "");
       } catch (error) {
-        console.error("Unexpected error loading profile:", error);
+        console.error("Error loading profile:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load profile information.",
+        });
       } finally {
         setIsLoading(false);
       }
     }
 
     loadProfile();
-  }, [user?.id]);
+  }, [user?.id, toast]);
 
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    try {
-      const file = event.target.files?.[0];
-      if (!file || !user?.id) return;
+    const file = event.target.files?.[0];
+    if (!file || !user?.id) return;
 
-      setIsUploading(true);
+    // Validate file type and size
+    const fileType = file.type.split("/")[0];
+    if (fileType !== "image") {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please upload an image file.",
+      });
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB.",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
 
+      // Upload new image
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(`${user.id}/${fileName}`, file, { upsert: true });
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
+      // Get public URL
       const { data: publicUrlData } = supabase.storage
         .from("avatars")
-        .getPublicUrl(`${user.id}/${fileName}`);
+        .getPublicUrl(filePath);
 
       if (!publicUrlData.publicUrl) throw new Error("Failed to get public URL");
 
+      // Update profile
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: publicUrlData.publicUrl })
@@ -115,29 +138,28 @@ export function ProfileCard() {
   };
 
   const handleUpdateFullName = async () => {
-    try {
-      if (!user?.id) return;
+    if (!user?.id || !newFullName.trim()) return;
 
+    try {
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: newFullName })
+        .update({ full_name: newFullName.trim() })
         .eq("user_id", user.id);
 
       if (error) throw error;
 
       setProfile((prev) => ({
         ...prev!,
-        full_name: newFullName,
+        full_name: newFullName.trim(),
       }));
 
       toast({
         title: "Success",
         description: "Full name updated successfully.",
       });
-
       setIsEditing(false);
     } catch (error) {
-      console.error("Error updating full name:", error);
+      console.error("Error updating name:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -184,18 +206,16 @@ export function ProfileCard() {
         <div className="flex flex-col items-center gap-6">
           <div className="relative">
             <Avatar className="h-32 w-32 border-4 border-primary/10">
-              <AvatarImage src={avatarUrl} alt={fullName} />
-
+              <AvatarImage
+                src={avatarUrl}
+                alt={fullName}
+                className="object-cover"
+              />
               <AvatarFallback className="text-2xl">
                 {fullName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
-              <img
-                src={profile?.avatar_url || "/default-avatar.png"}
-                alt="Profile"
-                className="w-20 h-20 rounded-full object-cover"
-              />
             </Avatar>
-            <div className="absolute -bottom-2 -right-2">
+            <div className="absolute bottom-0 right-0 z-10">
               <input
                 type="file"
                 id="avatar-upload"
@@ -204,7 +224,11 @@ export function ProfileCard() {
                 onChange={handleImageUpload}
                 disabled={isUploading}
               />
-              <label htmlFor="avatar-upload">
+              <label
+                htmlFor="avatar-upload"
+                className="cursor-pointer"
+                onClick={() => console.log("Camera button clicked!")} // Added console.log here
+              >
                 <Button
                   size="icon"
                   variant="secondary"
@@ -262,7 +286,9 @@ export function ProfileCard() {
             </div>
             <div className="flex flex-col items-center gap-2 pt-4 border-t">
               <p className="text-base font-medium">{user?.email}</p>
-              {isAdmin && <p variant="success">Admin</p>}
+              {isAdmin && (
+                <p className="text-sm font-medium text-green-600">Admin</p>
+              )}
               <p className="text-sm text-muted-foreground">
                 Member since {memberSince}
               </p>
@@ -272,4 +298,6 @@ export function ProfileCard() {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default ProfileCard;

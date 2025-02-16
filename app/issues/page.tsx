@@ -43,9 +43,9 @@ export default function IssuesPage() {
         .from("issues")
         .select(
           `
-        *,
-        user:profiles!fk_user_id(*)
-      `
+          *,
+          user:profiles!fk_user_id(*)
+        `
         )
         .order("created_at", { ascending: false });
 
@@ -58,8 +58,15 @@ export default function IssuesPage() {
       if (issuesError) throw issuesError;
 
       if (issuesData) {
-        console.log("Loaded issues:", issuesData);
-        setIssues(issuesData);
+        // Ensure reports array is initialized for each issue
+        const processedIssues = issuesData.map((issue) => ({
+          ...issue,
+          reports: issue.reports || [],
+          upvotes: issue.upvotes || [],
+          downvotes: issue.downvotes || [],
+        }));
+        console.log("Processed issues:", processedIssues);
+        setIssues(processedIssues);
       } else {
         setIssues([]);
       }
@@ -88,7 +95,6 @@ export default function IssuesPage() {
   useEffect(() => {
     loadIssues();
   }, [selectedCategory]);
-
   return (
     <PageTransition>
       <div className="space-y-8">
