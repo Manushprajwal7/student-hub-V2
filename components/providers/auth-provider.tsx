@@ -15,9 +15,33 @@ interface AuthContextType {
   ) => Promise<{ isNewUser: boolean }>;
   signOut: () => Promise<void>;
   isLoading: boolean;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
   isAdmin: boolean;
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const signUp = async (email: string, password: string, fullName: string) => {
+  try {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin + "/auth/callback",
+        data: { full_name: fullName },
+      },
+    });
+
+    if (error) {
+      if (error.message.includes("already registered")) {
+        throw new Error("Email already registered. Please sign in.");
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error("Sign up error:", error);
+    throw error;
+  }
+};
 
 const checkIsAdmin = (email: string): boolean => {
   try {
@@ -182,80 +206,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase, router]);
 
-  const signIn = async (email: string, password: string, fullName: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      // First try to sign in
-      let { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        if (error.message === "Invalid login credentials") {
-          // If login fails, attempt to sign up with email confirmation
-          await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: "https://student-hub-mp.vercel.app",
-              data: {
-                full_name: fullName,
-              },
-            },
-          });
-          if (signUpError) {
-            if (signUpError.message.includes("already registered")) {
-              throw new Error("Incorrect email or password");
-            }
-            throw signUpError;
-          }
-
-          // Return true to indicate this is a new user requiring verification
-          return { isNewUser: true };
-        } else {
-          throw error;
+        if (error.message === "Email not confirmed") {
+          throw new Error("Please verify your email before signing in");
         }
+        throw error;
       }
 
-      // Check if email is verified for existing users
       if (data.user && !data.user.email_confirmed_at) {
-        throw new Error(
-          "Please verify your email address before signing in. Check your inbox for the verification link."
-        );
+        throw new Error("Email not confirmed");
       }
 
-      if (data.session) {
-        const isAdmin = checkIsAdmin(email);
-
-        // Update profile
-        const { error: profileError } = await supabase.from("profiles").upsert(
-          {
-            user_id: data.session.user.id,
-            full_name: fullName,
-            avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
-              fullName
-            )}`,
-            is_admin: isAdmin,
-          },
-          { onConflict: "user_id" }
-        );
-
-        if (profileError) throw profileError;
-
-        if (isAdmin) {
-          await updateAdminFlag(supabase, data.session.user.id, true);
-        }
-
-        setState((prev) => ({
-          ...prev,
-          isAdmin,
-        }));
-
-        router.refresh();
-        router.push("/");
-      }
-
-      return { isNewUser: false };
+      router.push("/");
     } catch (error) {
       console.error("Sign in error:", error);
       throw error;
@@ -282,8 +251,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        const now = Math.floor(Date.now() / 1000);
+        if (session.expires_at && session.expires_at < now) {
+          const {
+            data: { session: newSession },
+          } = await supabase.auth.refreshSession();
+          if (newSession) {
+            setState((prev) => ({
+              ...prev,
+              session: newSession,
+              user: newSession.user,
+            }));
+          }
+        }
+      }
+    };
+
+    const interval = setInterval(checkSession, 60 * 1000); // Check every minute
+    return () => clearInterval(interval);
+  }, [supabase]);
+
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signOut }}>
+    <AuthContext.Provider value={{ ...state, signIn, signOut, signUp }}>
       {children}
     </AuthContext.Provider>
   );
