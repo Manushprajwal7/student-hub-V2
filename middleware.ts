@@ -14,27 +14,30 @@ const protectedRoutes = [
   "/settings",
 ];
 
+const publicRoutes = ["/login", "/signup", "/auth/callback"];
+
 export async function middleware(req: NextRequest) {
   try {
-    // Create a response object that we can modify
     const res = NextResponse.next();
-
-    // Create a Supabase client configured to use cookies
     const supabase = createMiddlewareClient({ req, res });
+    const pathname = req.nextUrl.pathname;
 
     // Refresh session if exists
     const {
       data: { session },
-      error,
     } = await supabase.auth.getSession();
-
-    const pathname = req.nextUrl.pathname;
 
     // Check if the current path is protected
     const isProtectedRoute = protectedRoutes.some((route) =>
       pathname.startsWith(route)
     );
 
+    // Check if the current path is public
+    const isPublicRoute = publicRoutes.some((route) =>
+      pathname.startsWith(route)
+    );
+
+    // Handle protected routes
     if (isProtectedRoute) {
       if (!session) {
         // Redirect to login if there's no session
@@ -58,32 +61,38 @@ export async function middleware(req: NextRequest) {
           // If refresh fails, redirect to login
           const redirectUrl = new URL("/login", req.url);
           redirectUrl.searchParams.set("redirectedFrom", pathname);
+          redirectUrl.searchParams.set("sessionExpired", "true");
           return NextResponse.redirect(redirectUrl);
         }
       }
     }
 
+    // Handle public routes for authenticated users
+    if (isPublicRoute && session) {
+      const redirectedFrom = req.nextUrl.searchParams.get("redirectedFrom");
+      const redirectUrl = new URL(redirectedFrom || "/", req.url);
+      return NextResponse.redirect(redirectUrl);
+    }
+
     return res;
   } catch (error) {
-    // If there's an error, redirect to login
+    console.error("Middleware error:", error);
     const redirectUrl = new URL("/login", req.url);
     redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname);
+    redirectUrl.searchParams.set("error", "middleware_error");
     return NextResponse.redirect(redirectUrl);
   }
 }
 
-// Update matcher to only run middleware on protected routes
 export const config = {
   matcher: [
-    "/resources/new",
-    "/issues/new",
-    "/events/new",
-    "/announcements/new",
-    "/jobs/new",
-    "/study-groups/new",
-    "/scholarships/new",
-    "/profile",
-    "/settings",
-    "/login",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
