@@ -8,12 +8,15 @@ import type { Session, User } from "@supabase/supabase-js";
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signIn: (email: string, password: string, fullName: string) => Promise<void>;
+  signIn: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<{ isNewUser: boolean }>;
   signOut: () => Promise<void>;
   isLoading: boolean;
   isAdmin: boolean;
 }
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const checkIsAdmin = (email: string): boolean => {
@@ -70,26 +73,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) throw error;
 
-        const isAdmin = session?.user?.email
-          ? checkIsAdmin(session.user.email)
-          : false;
+        if (session?.user) {
+          const isAdmin = session.user.email
+            ? checkIsAdmin(session.user.email)
+            : false;
 
-        if (session?.user && isAdmin) {
-          await updateAdminFlag(supabase, session.user.id, true);
+          // Ensure profile exists
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (!profile) {
+            await supabase.from("profiles").insert([
+              {
+                user_id: session.user.id,
+                full_name: session.user.user_metadata.full_name || "User",
+                avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+                  session.user.user_metadata.full_name || "User"
+                )}`,
+                is_admin: isAdmin,
+              },
+            ]);
+          }
+
+          setState({
+            session,
+            user: session.user,
+            isLoading: false,
+            isAdmin,
+          });
+        } else {
+          setState({
+            user: null,
+            session: null,
+            isLoading: false,
+            isAdmin: false,
+          });
         }
-
-        // Check if email is verified
-        if (session?.user && !session.user.email_confirmed_at) {
-          await signOut();
-          return;
-        }
-
-        setState({
-          session,
-          user: session?.user ?? null,
-          isLoading: false,
-          isAdmin,
-        });
       } catch (error) {
         console.error("Auth initialization error:", error);
         setState({
@@ -105,33 +127,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // Check email verification status on auth state change
-      if (session?.user && !session.user.email_confirmed_at) {
-        await signOut();
-        return;
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (session?.user) {
+          const isAdmin = session.user.email
+            ? checkIsAdmin(session.user.email)
+            : false;
+
+          // Check and create profile if needed
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (!profile) {
+            await supabase.from("profiles").insert([
+              {
+                user_id: session.user.id,
+                full_name: session.user.user_metadata.full_name || "User",
+                avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+                  session.user.user_metadata.full_name || "User"
+                )}`,
+                is_admin: isAdmin,
+              },
+            ]);
+          }
+
+          setState({
+            session,
+            user: session.user,
+            isLoading: false,
+            isAdmin,
+          });
+
+          router.refresh();
+        }
       }
 
-      const isAdmin = session?.user?.email
-        ? checkIsAdmin(session.user.email)
-        : false;
-
-      if (session?.user && isAdmin) {
-        await updateAdminFlag(supabase, session.user.id, true);
+      if (event === "SIGNED_OUT") {
+        setState({
+          user: null,
+          session: null,
+          isLoading: false,
+          isAdmin: false,
+        });
+        router.refresh();
+        router.push("/login");
       }
-
-      setState({
-        session,
-        user: session?.user ?? null,
-        isLoading: false,
-        isAdmin,
-      });
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase.auth]);
+  }, [supabase, router]);
 
   const signIn = async (email: string, password: string, fullName: string) => {
     try {
@@ -149,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email,
               password,
               options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`,
+                emailRedirectTo: "https://student-hub-mp.vercel.app/",
                 data: {
                   full_name: fullName,
                 },
@@ -163,14 +212,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw signUpError;
           }
 
-          // If sign up successful but email not confirmed
-          if (signUpData.user && !signUpData.user.email_confirmed_at) {
-            throw new Error(
-              "Please check your email to verify your account before signing in."
-            );
-          }
-
-          data = signUpData;
+          // Return true to indicate this is a new user requiring verification
+          return { isNewUser: true };
         } else {
           throw error;
         }
@@ -211,8 +254,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
 
         router.refresh();
-        router.push("/"); // Redirect to home on success
+        router.push("/");
       }
+
+      return { isNewUser: false };
     } catch (error) {
       console.error("Sign in error:", error);
       throw error;
