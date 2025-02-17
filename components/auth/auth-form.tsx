@@ -78,11 +78,12 @@ export function AuthForm() {
   return (
     <div className="space-y-6">
       {verificationSent && (
-        <Alert>
+        <Alert variant="success">
           <AlertDescription>
-            A verification email has been sent to your inbox. Please check your
-            email and click the verification link to complete your registration.
-            After verification, you can sign in to your account.
+            A verification email has been sent to{" "}
+            <strong>{form.getValues("email")}</strong>. Please check your inbox
+            and click the confirmation link to activate your account. You can
+            close this page now.
           </AlertDescription>
         </Alert>
       )}

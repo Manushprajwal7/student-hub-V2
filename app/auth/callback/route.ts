@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
               user_id: session.user.id,
               full_name: session.user.user_metadata.full_name || "User",
               avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
-                session.user.user_metadata.full_name || "User"
+                session.user.user_metadata.full_name || session.user.id
               )}`,
               is_admin: false,
             },

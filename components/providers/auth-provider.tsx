@@ -193,18 +193,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         if (error.message === "Invalid login credentials") {
           // If login fails, attempt to sign up with email confirmation
-          const { data: signUpData, error: signUpError } =
-            await supabase.auth.signUp({
-              email,
-              password,
-              options: {
-                emailRedirectTo: "https://student-hub-mp.vercel.app/",
-                data: {
-                  full_name: fullName,
-                },
+          await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: "https://student-hub-mp.vercel.app",
+              data: {
+                full_name: fullName,
               },
-            });
-
+            },
+          });
           if (signUpError) {
             if (signUpError.message.includes("already registered")) {
               throw new Error("Incorrect email or password");
