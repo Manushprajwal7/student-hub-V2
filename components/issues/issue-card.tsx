@@ -65,6 +65,9 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
   const [isVoting, setIsVoting] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const { toast } = useToast();
+  const [voteCount, setVoteCount] = useState(
+    issue.upvotes.length - issue.downvotes.length
+  );
   const REPORT_THRESHOLD = 4;
 
   const initials =
@@ -140,28 +143,49 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
       return;
     }
 
+    if (issue.resolved || hasBeenReported) {
+      toast({
+        variant: "destructive",
+        title: "Voting Disabled",
+        description: "You cannot vote on resolved or reported issues.",
+      });
+      return;
+    }
+
     try {
       setIsVoting(true);
+
+      // Optimistically update the UI
+      const oldUpvotes = [...issue.upvotes];
+      const oldDownvotes = [...issue.downvotes];
       let updatedUpvotes = [...issue.upvotes];
       let updatedDownvotes = [...issue.downvotes];
 
       if (voteType === "up") {
         if (hasUpvoted) {
+          // Remove upvote
           updatedUpvotes = updatedUpvotes.filter((id) => id !== currentUserId);
+          setVoteCount((prev) => prev - 1);
         } else {
+          // Add upvote and remove downvote if exists
           updatedUpvotes.push(currentUserId);
           updatedDownvotes = updatedDownvotes.filter(
             (id) => id !== currentUserId
           );
+          setVoteCount((prev) => prev + (hasDownvoted ? 2 : 1));
         }
       } else {
         if (hasDownvoted) {
+          // Remove downvote
           updatedDownvotes = updatedDownvotes.filter(
             (id) => id !== currentUserId
           );
+          setVoteCount((prev) => prev + 1);
         } else {
+          // Add downvote and remove upvote if exists
           updatedDownvotes.push(currentUserId);
           updatedUpvotes = updatedUpvotes.filter((id) => id !== currentUserId);
+          setVoteCount((prev) => prev - (hasUpvoted ? 2 : 1));
         }
       }
 
@@ -173,9 +197,22 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
         })
         .eq("id", issue.id);
 
-      if (error) throw error;
+      if (error) {
+        // Revert optimistic update on error
+        setVoteCount(oldUpvotes.length - oldDownvotes.length);
+        throw error;
+      }
 
+      // Update the parent component
       onVote();
+
+      // Show success toast for voting action
+      toast({
+        title: "Success",
+        description: `Vote ${
+          voteType === "up" ? "upvote" : "downvote"
+        } registered successfully.`,
+      });
     } catch (error) {
       console.error("Error voting:", error);
       toast({
@@ -187,6 +224,10 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
       setIsVoting(false);
     }
   };
+  useEffect(() => {
+    setVoteCount(issue.upvotes.length - issue.downvotes.length);
+  }, [issue.upvotes.length, issue.downvotes.length]);
+
   useEffect(() => {
     console.log(`Issue ${issue.id} report status:`, {
       reports: issue.reports,
@@ -335,30 +376,46 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
             variant="ghost"
             size="icon"
             className={cn(
-              hasUpvoted && "text-green-600",
+              "transition-colors duration-200",
+              hasUpvoted && "text-green-600 bg-green-50 dark:bg-green-900/20",
               (issue.resolved || hasBeenReported) &&
                 "opacity-50 cursor-not-allowed"
             )}
             onClick={() => handleVote("up")}
             disabled={isVoting || issue.resolved || hasBeenReported}
           >
-            <ArrowBigUp className="h-5 w-5" />
+            {isVoting ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <ArrowBigUp className="h-5 w-5" />
+            )}
           </Button>
-          <span className="min-w-[2ch] text-center font-medium">
-            {issue.upvotes.length - issue.downvotes.length}
+          <span
+            className={cn(
+              "min-w-[2ch] text-center font-medium transition-colors duration-200",
+              voteCount > 0 && "text-green-600",
+              voteCount < 0 && "text-red-600"
+            )}
+          >
+            {voteCount}
           </span>
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              hasDownvoted && "text-red-600",
+              "transition-colors duration-200",
+              hasDownvoted && "text-red-600 bg-red-50 dark:bg-red-900/20",
               (issue.resolved || hasBeenReported) &&
                 "opacity-50 cursor-not-allowed"
             )}
             onClick={() => handleVote("down")}
             disabled={isVoting || issue.resolved || hasBeenReported}
           >
-            <ArrowBigDown className="h-5 w-5" />
+            {isVoting ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <ArrowBigDown className="h-5 w-5" />
+            )}
           </Button>
         </div>
         <Button

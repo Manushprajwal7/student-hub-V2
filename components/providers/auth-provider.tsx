@@ -78,6 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await updateAdminFlag(supabase, session.user.id, true);
         }
 
+        // Check if email is verified
+        if (session?.user && !session.user.email_confirmed_at) {
+          await signOut();
+          return;
+        }
+
         setState({
           session,
           user: session?.user ?? null,
@@ -100,6 +106,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Check email verification status on auth state change
+      if (session?.user && !session.user.email_confirmed_at) {
+        await signOut();
+        return;
+      }
+
       const isAdmin = session?.user?.email
         ? checkIsAdmin(session.user.email)
         : false;
@@ -131,11 +143,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         if (error.message === "Invalid login credentials") {
-          // If login fails, attempt to sign up
+          // If login fails, attempt to sign up with email confirmation
           const { data: signUpData, error: signUpError } =
             await supabase.auth.signUp({
               email,
               password,
+              options: {
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+                data: {
+                  full_name: fullName,
+                },
+              },
             });
 
           if (signUpError) {
@@ -145,10 +163,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw signUpError;
           }
 
-          data = signUpData; // Use the signup data for the rest of the flow
+          // If sign up successful but email not confirmed
+          if (signUpData.user && !signUpData.user.email_confirmed_at) {
+            throw new Error(
+              "Please check your email to verify your account before signing in."
+            );
+          }
+
+          data = signUpData;
         } else {
           throw error;
         }
+      }
+
+      // Check if email is verified for existing users
+      if (data.user && !data.user.email_confirmed_at) {
+        throw new Error(
+          "Please verify your email address before signing in. Check your inbox for the verification link."
+        );
       }
 
       if (data.session) {
