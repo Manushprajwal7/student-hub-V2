@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import {
   Card,
@@ -12,11 +13,35 @@ import {
 } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
-export default function LoginPage() {
+function SearchParamsWrapper() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const verified = searchParams.get("verified");
 
+  return (
+    <>
+      {verified && (
+        <Alert variant="success" className="mb-4">
+          Email verified successfully! Please sign in.
+        </Alert>
+      )}
+
+      {error === "unverified_email" && (
+        <Alert variant="destructive" className="mb-4">
+          You must confirm your email before signing in.
+        </Alert>
+      )}
+
+      {error === "invalid_credentials" && (
+        <Alert variant="destructive" className="mb-4">
+          Invalid email or password
+        </Alert>
+      )}
+    </>
+  );
+}
+
+export default function LoginPage() {
   return (
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
       <Card className="w-full max-w-md">
@@ -27,23 +52,10 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {verified && (
-            <Alert variant="success" className="mb-4">
-              Email verified successfully! Please sign in.
-            </Alert>
-          )}
-
-          {error === "unverified_email" && (
-            <Alert variant="destructive" className="mb-4">
-              You must confirm your email before signing in.
-            </Alert>
-          )}
-
-          {error === "invalid_credentials" && (
-            <Alert variant="destructive" className="mb-4">
-              Invalid email or password
-            </Alert>
-          )}
+          {/* Wrap in Suspense to handle `useSearchParams()` */}
+          <Suspense fallback={null}>
+            <SearchParamsWrapper />
+          </Suspense>
 
           <SignInForm />
         </CardContent>

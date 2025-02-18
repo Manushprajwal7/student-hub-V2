@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import {
   Card,
@@ -12,11 +13,30 @@ import {
 } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 
-export default function SignUpPage() {
+function SearchParamsWrapper() {
   const searchParams = useSearchParams();
   const verificationSent = searchParams.get("verificationSent");
   const error = searchParams.get("error");
 
+  return (
+    <>
+      {verificationSent && (
+        <Alert variant="success" className="mb-4">
+          A confirmation email has been sent to your registered email ID. Please
+          check your inbox and verify your email to proceed.
+        </Alert>
+      )}
+
+      {error === "unverified_email" && (
+        <Alert variant="destructive" className="mb-4">
+          You must confirm your email before signing in.
+        </Alert>
+      )}
+    </>
+  );
+}
+
+export default function SignUpPage() {
   return (
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
       <Card className="w-full max-w-md">
@@ -27,18 +47,10 @@ export default function SignUpPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {verificationSent && (
-            <Alert variant="success" className="mb-4">
-              A confirmation email has been sent to your registered email ID.
-              Please check your inbox and verify your email to proceed.
-            </Alert>
-          )}
-
-          {error === "unverified_email" && (
-            <Alert variant="destructive" className="mb-4">
-              You must confirm your email before signing in.
-            </Alert>
-          )}
+          {/* Wrap SearchParamsWrapper in Suspense */}
+          <Suspense fallback={null}>
+            <SearchParamsWrapper />
+          </Suspense>
 
           <SignUpForm />
         </CardContent>
