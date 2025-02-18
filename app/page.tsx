@@ -9,6 +9,7 @@ import {
   GraduationCap,
   LifeBuoy,
   Megaphone,
+  Router,
   School,
   Users2,
 } from "lucide-react";
@@ -35,6 +36,7 @@ interface Stats {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats>({
     issues: 0,
     events: 0,
@@ -89,6 +91,7 @@ export default function Home() {
     };
 
     loadStats();
+    router.refresh();
   }, []);
 
   const statItems = [
