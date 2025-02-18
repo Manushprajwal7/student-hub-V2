@@ -9,9 +9,26 @@ export async function GET(request: Request) {
 
   if (code) {
     try {
-      await supabase.auth.exchangeCodeForSession(code);
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+
+      if (data.session?.user) {
+        // Generate an avatar URL
+        const avatarUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+          data.session.user.email || data.session.user.id
+        )}`;
+
+        await supabase.from("profiles").upsert({
+          user_id: data.session.user.id,
+          full_name: data.session.user.user_metadata?.full_name || "User",
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      // Redirect with query parameters
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?verified=true`
+        `${process.env.NEXT_PUBLIC_SITE_URL}/login?verified=true&refresh=true`
       );
     } catch (error) {
       return NextResponse.redirect(

@@ -1,8 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { Suspense } from "react";
+import { useEffect, Suspense } from "react";
+import { useAuth } from "@/components/providers/auth-provider";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import Link from "next/link";
 
 function SearchParamsWrapper() {
   const searchParams = useSearchParams();
@@ -37,6 +38,15 @@ function SearchParamsWrapper() {
 }
 
 export default function SignUpPage() {
+  const { user } = useAuth();
+
+  // Redirect authenticated users to the home page
+  useEffect(() => {
+    if (user) {
+      window.location.href = "/";
+    }
+  }, [user]);
+
   return (
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
       <Card className="w-full max-w-md">
@@ -47,11 +57,9 @@ export default function SignUpPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Wrap SearchParamsWrapper in Suspense */}
-          <Suspense fallback={null}>
+          <Suspense fallback={<p>Loading...</p>}>
             <SearchParamsWrapper />
           </Suspense>
-
           <SignUpForm />
         </CardContent>
       </Card>
