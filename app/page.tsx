@@ -13,7 +13,7 @@ import {
   School,
   Users2,
 } from "lucide-react";
-import { redirect } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,

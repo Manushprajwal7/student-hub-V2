@@ -27,6 +27,7 @@ export async function middleware(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
+    // Check if the current path is protected
     const isProtectedRoute = protectedRoutes.some((route) =>
       pathname.startsWith(route)
     );

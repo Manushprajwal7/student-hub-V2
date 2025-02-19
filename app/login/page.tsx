@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
-import { useAuth } from "@/components/providers/auth-provider";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import {
   Card,
@@ -16,20 +15,6 @@ import { Alert } from "@/components/ui/alert";
 
 function SearchParamsWrapper() {
   const searchParams = useSearchParams();
-  const router = useAuth();
-  const { refreshSession, user } = useAuth();
-
-  useEffect(() => {
-    refreshSession();
-  }, [refreshSession]);
-
-  useEffect(() => {
-    const refresh = searchParams.get("refresh");
-    if (refresh) {
-      router.refresh();
-    }
-  }, [searchParams, router]);
-
   const error = searchParams.get("error");
   const verified = searchParams.get("verified");
 
@@ -67,9 +52,11 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={<p>Loading...</p>}>
+          {/* Wrap in Suspense to handle `useSearchParams()` */}
+          <Suspense fallback={null}>
             <SearchParamsWrapper />
           </Suspense>
+
           <SignInForm />
         </CardContent>
       </Card>
