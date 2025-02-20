@@ -1,3 +1,4 @@
+// app/auth/callback/route.ts
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -9,18 +10,28 @@ export async function GET(request: Request) {
 
   if (code) {
     try {
-      await supabase.auth.exchangeCodeForSession(code);
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?verified=true`
-      );
+      // Exchange the code for a session
+      const {
+        data: { session },
+        error: exchangeError,
+      } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (exchangeError) throw exchangeError;
+
+      if (session) {
+        // Set session in the cookie
+        await supabase.auth.setSession(session);
+
+        // Redirect to home with success parameter
+        return NextResponse.redirect(new URL("/?auth=success", request.url));
+      }
     } catch (error) {
+      console.error("Error in auth callback:", error);
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=verification_failed`
+        new URL("/login?error=auth_callback_error", request.url)
       );
     }
   }
 
-  return NextResponse.redirect(
-    `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=invalid_code`
-  );
+  return NextResponse.redirect(new URL("/login?error=no_code", request.url));
 }

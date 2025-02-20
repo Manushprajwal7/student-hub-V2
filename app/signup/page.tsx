@@ -22,8 +22,9 @@ function SearchParamsWrapper() {
     <>
       {verificationSent && (
         <Alert variant="success" className="mb-4">
-          A confirmation email has been sent to your registered email ID. Please
-          check your inbox and verify your email to proceed.
+          Your Account Has Sucessfully Bein Created!. A confirmation email has
+          been sent to your registered email ID. Please check your inbox and
+          verify your email to proceed By Logining in .
         </Alert>
       )}
 
