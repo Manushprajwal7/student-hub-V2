@@ -52,8 +52,8 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Wrap in Suspense to handle `useSearchParams()` */}
-          <Suspense fallback={null}>
+
+          <Suspense fallback={<div>Loading...</div>}>
             <SearchParamsWrapper />
           </Suspense>
 
