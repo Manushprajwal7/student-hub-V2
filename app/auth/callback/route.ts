@@ -4,34 +4,46 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get("code");
-  const supabase = createRouteHandlerClient({ cookies });
-
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const next = requestUrl.searchParams.get('next') || '/';
+  
   if (code) {
+    const supabase = createRouteHandlerClient({ cookies });
+    
     try {
-      // Exchange the code for a session
-      const {
-        data: { session },
-        error: exchangeError,
-      } = await supabase.auth.exchangeCodeForSession(code);
+      const { data: { session }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      
+      if (exchangeError) {
+        throw exchangeError;
+      }
 
-      if (exchangeError) throw exchangeError;
-
+      // If we have a session, update it in the browser
       if (session) {
-        // Set session in the cookie
-        await supabase.auth.setSession(session);
+        // Set the auth cookie
+        const response = NextResponse.redirect(new URL(`${next}?verified=true`, request.url));
+        
+        // Set cookie with auth state
+        response.cookies.set('supabase-auth-token', JSON.stringify(session), {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 7, // 1 week
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+        });
 
-        // Redirect to home with success parameter
-        return NextResponse.redirect(new URL("/?auth=success", request.url));
+        return response;
       }
     } catch (error) {
-      console.error("Error in auth callback:", error);
+      console.error('Auth callback error:', error);
+      // Redirect to login with error
       return NextResponse.redirect(
-        new URL("/login?error=auth_callback_error", request.url)
+        new URL('/login?error=auth_callback_error', request.url)
       );
     }
   }
 
-  return NextResponse.redirect(new URL("/login?error=no_code", request.url));
+  // Return to login if no code was provided
+  return NextResponse.redirect(
+    new URL('/login?error=no_code', request.url)
+  );
 }
