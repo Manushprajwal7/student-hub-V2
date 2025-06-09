@@ -102,11 +102,7 @@ We welcome contributions of all kinds!
 
 ---
 
-## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
 
 ## 💬 Connect
 
