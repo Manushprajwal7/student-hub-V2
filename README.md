@@ -116,4 +116,4 @@ Have feedback or ideas? Reach out or contribute to the project. Let’s make **S
 
 ---
 
-### 🌟 Made with ❤️ by Students for Students
+### 🌟 Made with ❤️ by Student for Students
