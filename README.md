@@ -53,7 +53,7 @@ Follow these instructions to set up Student Hub locally on your machine.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/student-hub.git
+git clone https://github.com/Manushprajwal7/student-hub-V2
 cd student-hub
 ```
 
