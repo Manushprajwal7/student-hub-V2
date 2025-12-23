@@ -18,26 +18,30 @@ CREATE TABLE public.study_groups (
 );
 
 -- Create indexes
-CREATE INDEX idx_study_groups_user_id ON public.study_groups(user_id);
-CREATE INDEX idx_study_groups_subject ON public.study_groups(subject);
-CREATE INDEX idx_study_groups_created_at ON public.study_groups(created_at);
+CREATE INDEX IF NOT EXISTS idx_study_groups_user_id ON public.study_groups(user_id);
+CREATE INDEX IF NOT EXISTS idx_study_groups_subject ON public.study_groups(subject);
+CREATE INDEX IF NOT EXISTS idx_study_groups_created_at ON public.study_groups(created_at);
 
 -- Enable RLS
 ALTER TABLE public.study_groups ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+DROP POLICY IF EXISTS "Study groups are viewable by everyone" ON public.study_groups;
 CREATE POLICY "Study groups are viewable by everyone"
 ON public.study_groups FOR SELECT
 USING (true);
 
+DROP POLICY IF EXISTS "Users can create their own study groups" ON public.study_groups;
 CREATE POLICY "Users can create their own study groups"
 ON public.study_groups FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own study groups" ON public.study_groups;
 CREATE POLICY "Users can update their own study groups"
 ON public.study_groups FOR UPDATE
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own study groups" ON public.study_groups;
 CREATE POLICY "Users can delete their own study groups"
 ON public.study_groups FOR DELETE
 USING (auth.uid() = user_id);

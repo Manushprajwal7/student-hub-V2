@@ -1,7 +1,7 @@
--- Add parent_id column to comments table if it doesn't exist
+-- Superseded by 008_fix_comments_relationships.sql
+-- This file is kept for sequence integrity but the logic is handled in 008.
+/*
 ALTER TABLE public.comments
 ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES public.comments(id) ON DELETE CASCADE;
-
--- Add index for parent_id
-CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON public.comments(parent_id);
+*/
 

@@ -15,26 +15,30 @@ CREATE TABLE public.announcements (
 );
 
 -- Create indexes
-CREATE INDEX idx_announcements_user_id ON public.announcements(user_id);
-CREATE INDEX idx_announcements_priority ON public.announcements(priority);
-CREATE INDEX idx_announcements_date ON public.announcements(date);
+CREATE INDEX IF NOT EXISTS idx_announcements_user_id ON public.announcements(user_id);
+CREATE INDEX IF NOT EXISTS idx_announcements_priority ON public.announcements(priority);
+CREATE INDEX IF NOT EXISTS idx_announcements_date ON public.announcements(date);
 
 -- Enable RLS
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+DROP POLICY IF EXISTS "Announcements are viewable by everyone" ON public.announcements;
 CREATE POLICY "Announcements are viewable by everyone"
   ON public.announcements FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can create their own announcements" ON public.announcements;
 CREATE POLICY "Users can create their own announcements"
   ON public.announcements FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own announcements" ON public.announcements;
 CREATE POLICY "Users can update their own announcements"
   ON public.announcements FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own announcements" ON public.announcements;
 CREATE POLICY "Users can delete their own announcements"
   ON public.announcements FOR DELETE
   USING (auth.uid() = user_id);

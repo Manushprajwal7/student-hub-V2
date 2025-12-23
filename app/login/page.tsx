@@ -35,7 +35,7 @@ function SearchParamsWrapper() {
   return (
     <>
       {verified && (
-        <Alert variant="success" className="mb-4">
+        <Alert variant="default" className="mb-4 bg-green-50 text-green-700 border-green-200">
           Email verified successfully! Please sign in.
         </Alert>
       )}
@@ -69,7 +69,7 @@ export default function LoginPage() {
       </Suspense>
 
       <div className="mt-4 text-center text-sm">
-       New User?  Don't have an account?{" "}
+        New User? Don't have an account?{" "}
         <Link href="/signup" className="underline">
           Sign up
         </Link>

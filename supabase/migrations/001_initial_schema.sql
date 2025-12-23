@@ -8,6 +8,7 @@ CREATE TABLE public.profiles (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT,
     avatar_url TEXT,
+    is_admin BOOLEAN DEFAULT false,
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now(),
     CONSTRAINT unique_user_id UNIQUE (user_id)
@@ -32,34 +33,39 @@ CREATE TABLE public.resources (
 );
 
 -- Create indexes
-CREATE INDEX idx_profiles_user_id ON public.profiles(user_id);
-CREATE INDEX idx_resources_user_id ON public.resources(user_id);
-CREATE INDEX idx_resources_department ON public.resources(department);
-CREATE INDEX idx_resources_semester ON public.resources(semester);
-CREATE INDEX idx_resources_type ON public.resources(type);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_resources_user_id ON public.resources(user_id);
+CREATE INDEX IF NOT EXISTS idx_resources_department ON public.resources(department);
+CREATE INDEX IF NOT EXISTS idx_resources_semester ON public.resources(semester);
+CREATE INDEX IF NOT EXISTS idx_resources_type ON public.resources(type);
 
 -- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
+DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Profiles are viewable by everyone"
     ON public.profiles FOR SELECT
     USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
     ON public.profiles FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
     USING (auth.uid() = user_id);
 
 -- Resources policies
+DROP POLICY IF EXISTS "Resources are viewable by everyone" ON public.resources;
 CREATE POLICY "Resources are viewable by everyone"
     ON public.resources FOR SELECT
     USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own resources" ON public.resources;
 CREATE POLICY "Users can insert their own resources"
     ON public.resources FOR INSERT
     WITH CHECK (auth.uid() = user_id);
@@ -81,27 +87,19 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-alter table public.profiles enable row level security;
-
-create policy "Users can view their own profile"
-  on public.profiles for select
-  using ( auth.uid() = user_id );
-
-create policy "Users can update their own profile"
-  on public.profiles for update
-  using ( auth.uid() = user_id );
-
-create policy "Users can insert their own profile"
-  on public.profiles for insert
-  with check ( auth.uid() = user_id );
 
 -- Create a storage bucket for avatars
-insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true);
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
 
-create policy "Avatar images are publicly accessible."
-  on storage.objects for select
-  using ( bucket_id = 'avatars' );
+-- Storage policies are on a shared Supabase table, so we must be idempotent
+DROP POLICY IF EXISTS "Avatar images are publicly accessible." ON storage.objects;
+CREATE POLICY "Avatar images are publicly accessible."
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
 
-create policy "Users can upload avatars."
-  on storage.objects for insert
-  with check ( bucket_id = 'avatars' AND auth.uid() = owner );
+DROP POLICY IF EXISTS "Users can upload avatars." ON storage.objects;
+CREATE POLICY "Users can upload avatars."
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'avatars' AND auth.uid() = owner);

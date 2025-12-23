@@ -21,26 +21,30 @@ CREATE TABLE public.jobs (
 );
 
 -- Create indexes
-CREATE INDEX idx_jobs_user_id ON public.jobs(user_id);
-CREATE INDEX idx_jobs_type ON public.jobs(type);
-CREATE INDEX idx_jobs_created_at ON public.jobs(created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON public.jobs(user_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_type ON public.jobs(type);
+CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON public.jobs(created_at);
 
 -- Enable RLS
 ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+DROP POLICY IF EXISTS "Jobs are viewable by everyone" ON public.jobs;
 CREATE POLICY "Jobs are viewable by everyone"
   ON public.jobs FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can create their own job posts" ON public.jobs;
 CREATE POLICY "Users can create their own job posts"
   ON public.jobs FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own job posts" ON public.jobs;
 CREATE POLICY "Users can update their own job posts"
   ON public.jobs FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own job posts" ON public.jobs;
 CREATE POLICY "Users can delete their own job posts"
   ON public.jobs FOR DELETE
   USING (auth.uid() = user_id);

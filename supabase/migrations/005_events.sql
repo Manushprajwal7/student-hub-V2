@@ -18,26 +18,30 @@ CREATE TABLE public.events (
 );
 
 -- Create indexes
-CREATE INDEX idx_events_user_id ON public.events(user_id);
-CREATE INDEX idx_events_type ON public.events(type);
-CREATE INDEX idx_events_date ON public.events(date);
+CREATE INDEX IF NOT EXISTS idx_events_user_id ON public.events(user_id);
+CREATE INDEX IF NOT EXISTS idx_events_type ON public.events(type);
+CREATE INDEX IF NOT EXISTS idx_events_date ON public.events(date);
 
 -- Enable RLS
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+DROP POLICY IF EXISTS "Events are viewable by everyone" ON public.events;
 CREATE POLICY "Events are viewable by everyone"
 ON public.events FOR SELECT
 USING (true);
 
+DROP POLICY IF EXISTS "Users can create their own events" ON public.events;
 CREATE POLICY "Users can create their own events"
 ON public.events FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own events" ON public.events;
 CREATE POLICY "Users can update their own events"
 ON public.events FOR UPDATE
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own events" ON public.events;
 CREATE POLICY "Users can delete their own events"
 ON public.events FOR DELETE
 USING (auth.uid() = user_id);

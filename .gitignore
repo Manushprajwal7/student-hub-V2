@@ -25,3 +25,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local backups and zips
+*.zip
+*.gz
+*.backup.gz
+
+# code context tools
+code_context.txt
+get_code_context.sh

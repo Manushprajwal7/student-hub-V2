@@ -213,6 +213,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error.message.includes("already registered")) {
           throw new Error("Email already registered. Please sign in.");
         }
+        if (error.message.includes("Error sending confirmation email")) {
+          throw new Error(
+            "Confirmation email could not be sent. If you are the developer, please disable 'Confirm email' in your Supabase Auth settings for local development."
+          );
+        }
         throw error;
       }
     } catch (error) {

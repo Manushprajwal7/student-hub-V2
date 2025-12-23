@@ -29,26 +29,30 @@ CREATE TABLE public.scholarships (
 );
 
 -- Create indexes
-CREATE INDEX idx_scholarships_user_id ON public.scholarships(user_id);
-CREATE INDEX idx_scholarships_category ON public.scholarships(category);
-CREATE INDEX idx_scholarships_deadline ON public.scholarships(deadline);
+CREATE INDEX IF NOT EXISTS idx_scholarships_user_id ON public.scholarships(user_id);
+CREATE INDEX IF NOT EXISTS idx_scholarships_category ON public.scholarships(category);
+CREATE INDEX IF NOT EXISTS idx_scholarships_deadline ON public.scholarships(deadline);
 
 -- Enable RLS
 ALTER TABLE public.scholarships ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+DROP POLICY IF EXISTS "Scholarships are viewable by everyone" ON public.scholarships;
 CREATE POLICY "Scholarships are viewable by everyone"
   ON public.scholarships FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can create scholarships" ON public.scholarships;
 CREATE POLICY "Users can create scholarships"
   ON public.scholarships FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own scholarships" ON public.scholarships;
 CREATE POLICY "Users can update their own scholarships"
   ON public.scholarships FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own scholarships" ON public.scholarships;
 CREATE POLICY "Users can delete their own scholarships"
   ON public.scholarships FOR DELETE
   USING (auth.uid() = user_id);

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const passwordRules = z
   .string()
@@ -43,26 +44,18 @@ export function SignUpForm() {
     },
   });
 
+  const { signUp } = useAuth();
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Registration failed");
-      }
-
+      await signUp(values.email, values.password, values.fullName);
       router.push("/signup?verificationSent=true");
     } catch (error) {
       if (error instanceof Error) {
         form.setError("root", { type: "manual", message: error.message });
+      } else {
+        form.setError("root", { type: "manual", message: "Registration failed" });
       }
     } finally {
       setIsLoading(false);

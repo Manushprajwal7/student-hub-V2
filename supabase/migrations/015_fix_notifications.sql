@@ -27,17 +27,19 @@ CREATE TABLE public.notifications (
 );
 
 -- Add better indexes for performance
-CREATE INDEX idx_notifications_user_id_created_at ON public.notifications(user_id, created_at DESC);
-CREATE INDEX idx_notifications_user_id_read ON public.notifications(user_id, read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id_created_at ON public.notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id_read ON public.notifications(user_id, read);
 
 -- Enable RLS
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- Update RLS policies
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
 CREATE POLICY "Users can view their own notifications"
   ON public.notifications FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
 CREATE POLICY "Users can update their own notifications"
   ON public.notifications FOR UPDATE
   USING (auth.uid() = user_id);
@@ -112,36 +114,43 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create triggers for each content type
+DROP TRIGGER IF EXISTS notify_new_issue ON issues;
 CREATE TRIGGER notify_new_issue
   AFTER INSERT ON issues
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_content_creation();
 
+DROP TRIGGER IF EXISTS notify_new_event ON events;
 CREATE TRIGGER notify_new_event
   AFTER INSERT ON events
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_content_creation();
 
+DROP TRIGGER IF EXISTS notify_new_announcement ON announcements;
 CREATE TRIGGER notify_new_announcement
   AFTER INSERT ON announcements
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_content_creation();
 
+DROP TRIGGER IF EXISTS notify_new_resource ON resources;
 CREATE TRIGGER notify_new_resource
   AFTER INSERT ON resources
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_content_creation();
 
+DROP TRIGGER IF EXISTS notify_new_job ON jobs;
 CREATE TRIGGER notify_new_job
   AFTER INSERT ON jobs
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_content_creation();
 
+DROP TRIGGER IF EXISTS notify_new_study_group ON study_groups;
 CREATE TRIGGER notify_new_study_group
   AFTER INSERT ON study_groups
   FOR EACH ROW
   EXECUTE FUNCTION notify_on_content_creation();
 
+DROP TRIGGER IF EXISTS notify_new_scholarship ON scholarships;
 CREATE TRIGGER notify_new_scholarship
   AFTER INSERT ON scholarships
   FOR EACH ROW

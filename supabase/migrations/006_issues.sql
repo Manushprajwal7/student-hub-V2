@@ -14,6 +14,9 @@ CREATE TABLE public.issues (
   upvotes UUID[] DEFAULT ARRAY[]::UUID[],
   downvotes UUID[] DEFAULT ARRAY[]::UUID[],
   reports UUID[] DEFAULT ARRAY[]::UUID[],
+  resolved BOOLEAN DEFAULT false,
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT valid_category CHECK (
@@ -46,55 +49,51 @@ CREATE TABLE public.comments (
 );
 
 -- Create indexes
-CREATE INDEX idx_issues_user_id ON public.issues(user_id);
-CREATE INDEX idx_issues_category ON public.issues(category);
-CREATE INDEX idx_comments_issue_id ON public.comments(issue_id);
-CREATE INDEX idx_comments_user_id ON public.comments(user_id);
-CREATE INDEX idx_comments_parent_id ON public.comments(parent_id);
+CREATE INDEX IF NOT EXISTS idx_issues_user_id ON public.issues(user_id);
+CREATE INDEX IF NOT EXISTS idx_issues_category ON public.issues(category);
+CREATE INDEX IF NOT EXISTS idx_issues_resolved ON public.issues(resolved);
+CREATE INDEX IF NOT EXISTS idx_comments_issue_id ON public.comments(issue_id);
+CREATE INDEX IF NOT EXISTS idx_comments_user_id ON public.comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON public.comments(parent_id);
 
 -- Enable RLS
 ALTER TABLE public.issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE issues
-ADD COLUMN IF NOT EXISTS reports text[] DEFAULT '{}';
 
 -- Create policies for issues
+DROP POLICY IF EXISTS "Issues are viewable by everyone" ON public.issues;
 CREATE POLICY "Issues are viewable by everyone"
   ON public.issues FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can create issues" ON public.issues;
 CREATE POLICY "Users can create issues"
   ON public.issues FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own issues" ON public.issues;
 CREATE POLICY "Users can update their own issues"
   ON public.issues FOR UPDATE
   USING (auth.uid() = user_id);
 
 -- Create policies for comments
+DROP POLICY IF EXISTS "Comments are viewable by everyone" ON public.comments;
 CREATE POLICY "Comments are viewable by everyone"
   ON public.comments FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can create comments" ON public.comments;
 CREATE POLICY "Users can create comments"
   ON public.comments FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own comments" ON public.comments;
 CREATE POLICY "Users can update their own comments"
   ON public.comments FOR UPDATE
   USING (auth.uid() = user_id);
 
-ALTER TABLE issues 
-    ADD CONSTRAINT fk_user_id 
-    FOREIGN KEY (user_id) 
-    REFERENCES profiles(user_id);
-
-ALTER TABLE issues 
-    ADD CONSTRAINT fk_resolved_by 
-    FOREIGN KEY (resolved_by) 
-    REFERENCES profiles(user_id);
-
-
+-- Admin policies
+DROP POLICY IF EXISTS "Admins can update issues" ON public.issues;
 CREATE POLICY "Admins can update issues"
 ON public.issues
 FOR UPDATE
@@ -106,4 +105,3 @@ USING (
       AND profiles.is_admin = true
   )
 );
-UPDATE profiles SET is_admin = true WHERE user_id = 'your-admin-user-id';

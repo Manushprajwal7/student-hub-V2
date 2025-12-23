@@ -1,8 +1,10 @@
 -- Add missing RLS policies for delete operations
+DROP POLICY IF EXISTS "Users can delete their own issues" ON public.issues;
 CREATE POLICY "Users can delete their own issues"
 ON public.issues FOR DELETE
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own resources" ON public.resources;
 CREATE POLICY "Users can delete their own resources"
 ON public.resources FOR DELETE
 USING (auth.uid() = user_id);
