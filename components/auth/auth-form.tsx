@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Eye, EyeOff } from "lucide-react"; // Import Eye icons
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import {
   Form,
   FormControl,
@@ -26,12 +27,17 @@ const formSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-export function AuthForm() {
+interface AuthFormProps {
+  type: "login" | "register";
+}
+
+export function AuthForm({ type }: AuthFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // Password visibility state
+  const [showPassword, setShowPassword] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,26 +53,37 @@ export function AuthForm() {
     setVerificationSent(false);
 
     try {
-      const { isNewUser } = await signIn(
-        values.email,
-        values.password,
-        values.fullName
-      );
-
-      if (isNewUser) {
+      if (type === "register") {
+        await signUp(values.email, values.password, values.fullName);
         setVerificationSent(true);
         form.reset();
+        toast({
+          title: "Account Created",
+          description: "Please check your email to verify your account.",
+        });
+      } else {
+        await signIn(values.email, values.password);
+        toast({
+          title: "Welcome Back",
+          description: "Successfully signed in!",
+        });
+        router.push("/");
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error(`Auth error (${type}):`, error);
       let errorMessage = "Something went wrong. Please try again.";
 
-      if (error instanceof Error) {
-        errorMessage = error.message;
+      if (error?.message) {
+        if (error.message === "unverified_email") {
+          errorMessage = "Please verify your email before signing in.";
+        } else {
+          errorMessage = error.message;
+        }
       }
 
       toast({
         variant: "destructive",
-        title: "Sign In Failed",
+        title: type === "register" ? "Registration Failed" : "Sign In Failed",
         description: errorMessage,
       });
 
@@ -79,7 +96,7 @@ export function AuthForm() {
   return (
     <div className="space-y-6">
       {verificationSent && (
-        <Alert variant="success">
+        <Alert>
           <AlertDescription>
             A verification email has been sent to{" "}
             <strong>{form.getValues("email")}</strong>. Please check your inbox

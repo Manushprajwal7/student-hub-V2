@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -53,6 +55,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function NewAnnouncementPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,6 +69,7 @@ export default function NewAnnouncementPage() {
 
   async function onSubmit(data: FormValues) {
     try {
+      const supabase = createClientComponentClient()
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -90,7 +94,13 @@ export default function NewAnnouncementPage() {
           user_id: session.user.id,
         });
 
-      if (announcementError) throw announcementError;
+      if (announcementError) {
+        console.error("Supabase insert error (announcements):", announcementError)
+        throw announcementError
+      }
+
+      // Invalidate announcements query
+      queryClient.invalidateQueries({ queryKey: ["announcements"] })
 
       toast({
         title: "Success",
@@ -98,15 +108,12 @@ export default function NewAnnouncementPage() {
       });
       form.reset();
       router.push("/announcements");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating announcement:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to create announcement. Please try again.",
+        description: `Failed to create announcement: ${error.message || "Unknown error"}`,
       });
     }
   }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import {
   Card,
@@ -11,48 +10,13 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
-import type { Resource } from "@/lib/types/resources";
+import type { ResourceWithUser } from "@/types/resources";
 
 interface ResourceCardProps {
-  resource: Resource;
+  resource: ResourceWithUser;
 }
 
 export function ResourceCard({ resource }: ResourceCardProps) {
-  const [creatorName, setCreatorName] = useState<string | null>(null);
-
-  // Function to validate UUID format
-  const isValidUUID = (id: string | null | undefined): boolean => {
-    return !!id && /^[0-9a-fA-F-]{36}$/.test(id);
-  };
-
-  // Fetch resource creator's name from profiles table
-  useEffect(() => {
-    async function fetchCreator() {
-      if (!isValidUUID(resource.user_id)) {
-        console.error("Invalid UUID format for user_id:", resource.user_id);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("user_id", resource.user_id) // Ensures only valid UUIDs are queried
-        .single();
-
-      if (error) {
-        console.error("Error fetching creator:", error);
-        setCreatorName("Unknown User");
-        return;
-      }
-
-      setCreatorName(data?.full_name || "Unknown User");
-    }
-
-    fetchCreator();
-  }, [resource.user_id]);
-
-  // Ensure URL is valid and external
   const isValidUrl = (url: string) => {
     try {
       new URL(url);
@@ -79,9 +43,7 @@ export function ResourceCard({ resource }: ResourceCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {resource.description}
-          </p>
+          <p className="text-sm text-muted-foreground">{resource.description}</p>
           <div className="flex flex-wrap gap-2">
             {resource.tags?.map((tag) => (
               <Badge key={tag} variant="secondary">
@@ -107,10 +69,11 @@ export function ResourceCard({ resource }: ResourceCardProps) {
           <div className="text-xs text-muted-foreground">
             Shared on {new Date(resource.created_at).toLocaleDateString()}
           </div>
-          {/* Display the creator's name */}
-          <div className="text-xs font-semibold text-muted-foreground">
-            Created by: {creatorName}
-          </div>
+          {resource.user && (
+            <div className="text-xs font-semibold text-muted-foreground">
+              Created by: {resource.user.full_name || "Unknown User"}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

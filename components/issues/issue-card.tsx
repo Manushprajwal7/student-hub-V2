@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
-import type { IssueWithUser } from "@/types/issues";
+import type { IssueWithUser, IssueCategory } from "@/types/issues";
 import { AlertTriangle } from "lucide-react";
 import {
   Dialog,
@@ -32,12 +32,7 @@ interface IssueCardProps {
   currentUserId?: string;
   onVote: () => void;
 }
-interface IssueWithUser {
-  // ... existing properties
-  reports: string[];
-  resolved: boolean;
-}
-const categoryColors = {
+const categoryColors: Record<IssueCategory, string> = {
   Teaching:
     "bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-300",
   "Women Rights":
@@ -118,7 +113,7 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
 
       toast({
         title: "Success",
-        description: reports.includes(currentUserId)
+        description: issue.reports.includes(currentUserId)
           ? "Report removed successfully."
           : "Issue reported successfully.",
       });
@@ -228,13 +223,6 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
     setVoteCount(issue.upvotes.length - issue.downvotes.length);
   }, [issue.upvotes.length, issue.downvotes.length]);
 
-  useEffect(() => {
-    console.log(`Issue ${issue.id} report status:`, {
-      reports: issue.reports,
-      hasBeenReported,
-      hasReported,
-    });
-  }, [issue.id, issue.reports, hasBeenReported, hasReported]);
 
   return (
     <Card
@@ -262,7 +250,7 @@ export function IssueCard({ issue, currentUserId, onVote }: IssueCardProps) {
               )}
             </CardTitle>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge className={categoryColors[issue.category]}>
+              <Badge className={categoryColors[issue.category as IssueCategory]}>
                 {issue.category}
               </Badge>
               {issue.resolved && (

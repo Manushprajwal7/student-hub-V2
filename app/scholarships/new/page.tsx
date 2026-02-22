@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useQueryClient } from "@tanstack/react-query"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { CalendarIcon, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { z } from "zod"
@@ -36,9 +38,10 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 export default function NewScholarshipPage() {
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const { toast } = useToast()
   const router = useRouter()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -55,6 +58,7 @@ export default function NewScholarshipPage() {
   async function onSubmit(data: FormValues) {
     try {
       setIsSubmitting(true)
+      const supabase = createClientComponentClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -85,19 +89,25 @@ export default function NewScholarshipPage() {
         reports: [],
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Supabase insert error (scholarships):", error)
+        throw error
+      }
+
+      // Invalidate scholarships query
+      queryClient.invalidateQueries({ queryKey: ["scholarships"] })
 
       toast({
         title: "Success",
         description: "Scholarship created successfully!",
       })
       router.push("/scholarships")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating scholarship:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create scholarship. Please try again.",
+        description: `Failed to create scholarship: ${error.message || "Unknown error"}`,
       })
     } finally {
       setIsSubmitting(false)

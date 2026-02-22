@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useQueryClient } from "@tanstack/react-query"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Loader2 } from "lucide-react"
 import { z } from "zod"
 
@@ -35,15 +37,16 @@ const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   location: z.string().min(1, "Location is required"),
-  category: z.enum(categories),
+  category: z.enum(["Teaching", "Women Rights", "Ragging", "Cultural Events", "Campus", "Sports", "Fest", "Infrastructure", "Academics", "Student Services", "Extracurricular Activities"] as const),
   tags: z.string(),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 export default function NewIssuePage() {
-  const router = useRouter()
   const { toast } = useToast()
+  const router = useRouter()
+  const queryClient = useQueryClient()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormValues>({
@@ -60,6 +63,8 @@ export default function NewIssuePage() {
   const onSubmit = async (data: FormValues) => {
     try {
       setIsSubmitting(true)
+      const supabase = createClientComponentClient()
+      
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -74,8 +79,28 @@ export default function NewIssuePage() {
         return
       }
 
+      // 1. Ensure profile exists (to satisfy FK constraint)
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", session.user.id)
+        .single()
+
+      if (!profile) {
+        console.log("Creating missing profile for user...")
+        await supabase.from("profiles").insert({
+          user_id: session.user.id,
+          full_name: session.user.user_metadata.full_name || "User",
+          avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${session.user.id}`,
+        })
+      }
+
+      // 2. Insert issue
       const { error } = await supabase.from("issues").insert({
-        ...data,
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        category: data.category,
         tags: data.tags
           .split(",")
           .map((tag) => tag.trim())
@@ -86,19 +111,25 @@ export default function NewIssuePage() {
         reports: [],
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Supabase insert error:", error)
+        throw error
+      }
+
+      // Invalidate issues query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["issues"] })
 
       toast({
         title: "Success",
         description: "Issue created successfully!",
       })
       router.push("/issues")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating issue:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create issue. Please try again.",
+        description: `Failed to create issue: ${error.message || "Unknown error"}`,
       })
     } finally {
       setIsSubmitting(false)

@@ -83,31 +83,78 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION notify_on_content_creation() RETURNS TRIGGER AS $$
 BEGIN
   -- Get the type of content from TG_TABLE_NAME
-  PERFORM create_notification(
-    NEW.user_id,
-    CASE TG_TABLE_NAME
-      WHEN 'issues' THEN 'New Issue Created'
-      WHEN 'events' THEN 'New Event Created'
-      WHEN 'announcements' THEN 'New Announcement'
-      WHEN 'resources' THEN 'New Resource Shared'
-      WHEN 'jobs' THEN 'New Job Posted'
-      WHEN 'study_groups' THEN 'New Study Group'
-      WHEN 'scholarships' THEN 'New Scholarship'
-    END,
-    CASE TG_TABLE_NAME
-      WHEN 'issues' THEN 'A new issue has been created: ' || NEW.title
-      WHEN 'events' THEN 'A new event has been created: ' || NEW.title
-      WHEN 'announcements' THEN 'New announcement: ' || NEW.title
-      WHEN 'resources' THEN 'A new resource has been shared: ' || NEW.title
-      WHEN 'jobs' THEN 'A new job has been posted: ' || NEW.title
-      WHEN 'study_groups' THEN 'A new study group has been created: ' || NEW.name
-      WHEN 'scholarships' THEN 'A new scholarship is available: ' || NEW.title
-    END,
-    TG_TABLE_NAME,
-    NEW.id,
-    TG_TABLE_NAME,
-    '/' || TG_TABLE_NAME || '/' || NEW.id
-  );
+  -- Use CASE statements to access appropriate fields based on table name
+  IF TG_TABLE_NAME = 'issues' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Issue Created',
+      'A new issue has been created: ' || NEW.title,
+      'issue',
+      NEW.id,
+      'issue',
+      '/issues/' || NEW.id
+    );
+  ELSIF TG_TABLE_NAME = 'events' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Event Created',
+      'A new event has been created: ' || NEW.title,
+      'event',
+      NEW.id,
+      'event',
+      '/events/' || NEW.id
+    );
+  ELSIF TG_TABLE_NAME = 'announcements' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Announcement',
+      'New announcement: ' || NEW.title,
+      'announcement',
+      NEW.id,
+      'announcement',
+      '/announcements/' || NEW.id
+    );
+  ELSIF TG_TABLE_NAME = 'resources' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Resource Shared',
+      'A new resource has been shared: ' || NEW.title,
+      'resource',
+      NEW.id,
+      'resource',
+      '/resources/' || NEW.id
+    );
+  ELSIF TG_TABLE_NAME = 'jobs' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Job Posted',
+      'A new job has been posted: ' || NEW.title,
+      'job',
+      NEW.id,
+      'job',
+      '/jobs/' || NEW.id
+    );
+  ELSIF TG_TABLE_NAME = 'study_groups' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Study Group',
+      'A new study group has been created: ' || NEW.name,
+      'study_group',
+      NEW.id,
+      'study_group',
+      '/study-groups/' || NEW.id
+    );
+  ELSIF TG_TABLE_NAME = 'scholarships' THEN
+    PERFORM create_notification(
+      NEW.user_id,
+      'New Scholarship',
+      'A new scholarship is available: ' || NEW.title,
+      'scholarship',
+      NEW.id,
+      'scholarship',
+      '/scholarships/' || NEW.id
+    );
+  END IF;
   
   RETURN NEW;
 END;

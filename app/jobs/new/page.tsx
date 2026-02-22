@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -67,6 +69,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function NewJobPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -85,6 +88,7 @@ export default function NewJobPage() {
 
   async function onSubmit(data: FormValues) {
     try {
+      const supabase = createClientComponentClient()
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -112,7 +116,13 @@ export default function NewJobPage() {
         user_id: session.user.id,
       });
 
-      if (jobError) throw jobError;
+      if (jobError) {
+        console.error("Supabase insert error (jobs):", jobError)
+        throw jobError
+      }
+
+      // Invalidate jobs query
+      queryClient.invalidateQueries({ queryKey: ["jobs"] })
 
       toast({
         title: "Success",
@@ -120,15 +130,12 @@ export default function NewJobPage() {
       });
       form.reset();
       router.push("/jobs");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating job:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to create job. Please try again.",
+        description: `Failed to create job: ${error.message || "Unknown error"}`,
       });
     }
   }

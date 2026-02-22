@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { z } from "zod";
@@ -89,6 +90,7 @@ export function ShareResourceDialog({ onSuccess }: ShareResourceDialogProps) {
   const { user } = useAuth(); // Use the auth hook
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -144,6 +146,9 @@ export function ShareResourceDialog({ onSuccess }: ShareResourceDialogProps) {
       });
 
       if (resourceError) throw resourceError;
+      
+      // Invalidate resources query
+      queryClient.invalidateQueries({ queryKey: ["resources"] });
 
       toast({
         title: "Success",

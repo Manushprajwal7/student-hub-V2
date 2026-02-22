@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
+import { useQueryClient } from "@tanstack/react-query"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Loader2 } from "lucide-react"
 import { z } from "zod"
 
@@ -43,6 +45,7 @@ type FormValues = z.infer<typeof formSchema>
 export default function NewStudyGroupPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormValues>({
@@ -60,6 +63,7 @@ export default function NewStudyGroupPage() {
   const onSubmit = async (data: FormValues) => {
     try {
       setIsSubmitting(true)
+      const supabase = createClientComponentClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -80,19 +84,25 @@ export default function NewStudyGroupPage() {
         members: [session.user.id],
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Supabase insert error (study_groups):", error)
+        throw error
+      }
+
+      // Invalidate study-groups query
+      queryClient.invalidateQueries({ queryKey: ["study-groups"] })
 
       toast({
         title: "Success",
         description: "Study group created successfully!",
       })
       router.push("/study-groups")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating study group:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create study group. Please try again.",
+        description: `Failed to create study group: ${error.message || "Unknown error"}`,
       })
     } finally {
       setIsSubmitting(false)

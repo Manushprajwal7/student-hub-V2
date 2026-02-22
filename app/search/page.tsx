@@ -100,28 +100,30 @@ function SearchResults() {
     search();
   }, [query]);
 
+  const noop = () => {}
+
   const renderResult = (result: any) => {
     const commonProps = {
       key: result.id,
-    };
+    }
 
     switch (result.type) {
       case "issue":
-        return <IssueCard issue={result} {...commonProps} />;
+        return <IssueCard issue={result} {...commonProps} onVote={noop} />
       case "event":
-        return <EventCard event={result} {...commonProps} />;
+        return <EventCard event={result} {...commonProps} onRegister={noop} />
       case "announcement":
-        return <AnnouncementCard announcement={result} {...commonProps} />;
+        return <AnnouncementCard announcement={result} {...commonProps} />
       case "resource":
-        return <ResourceCard resource={result} {...commonProps} />;
+        return <ResourceCard resource={result} {...commonProps} />
       case "job":
-        return <JobCard job={result} {...commonProps} />;
+        return <JobCard job={result} {...commonProps} />
       case "study_group":
-        return <StudyGroupCard group={result} {...commonProps} />;
+        return <StudyGroupCard group={result} {...commonProps} onJoinLeave={noop} />
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   return (
     <div className="space-y-8">

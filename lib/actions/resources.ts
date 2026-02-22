@@ -5,21 +5,17 @@ export async function getResources() {
   try {
     const { data, error } = await supabase
       .from("resources")
-      .select(
-        `
-        *,
-        user:profiles(full_name, avatar_url)
-      `
-      )
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
+      console.error("Supabase error fetching resources (getResources):", error)
       throw error;
     }
 
     return data as ResourceWithUser[];
   } catch (error) {
-    console.error("Error fetching resources:", error);
+    console.error("Error in getResources:", error);
     throw error;
   }
 }
@@ -27,12 +23,17 @@ export async function getResources() {
 export async function createResource(data: Resource, userId: string) {
   try {
     const formattedData = {
-      ...data,
+      title: data.title,
+      description: data.description,
+      url: data.url,
+      department: data.department,
+      semester: data.semester,
+      type: data.type,
       user_id: userId,
       tags: Array.isArray(data.tags)
         ? data.tags
         : data.tags
-        ? data.tags
+        ? (data.tags as unknown as string)
             .split(",")
             .map((tag) => tag.trim())
             .filter(Boolean)
@@ -42,10 +43,11 @@ export async function createResource(data: Resource, userId: string) {
     const { error } = await supabase.from("resources").insert(formattedData);
 
     if (error) {
+      console.error("Supabase insert error (resources):", error)
       throw error;
     }
   } catch (error) {
-    console.error("Error creating resource:", error);
+    console.error("Error in createResource:", error);
     throw error;
   }
 }

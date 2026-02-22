@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -68,6 +70,7 @@ export default function NewEventPage() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -83,12 +86,12 @@ export default function NewEventPage() {
 
   async function onSubmit(data: FormValues) {
     try {
+      const supabase = createClientComponentClient()
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!session) {
-        setOpen(false);
         toast({
           variant: "destructive",
           title: "Authentication Required",
@@ -109,24 +112,26 @@ export default function NewEventPage() {
         registrations: [],
       });
 
-      if (eventError) throw eventError;
+      if (eventError) {
+        console.error("Supabase insert error (events):", eventError)
+        throw eventError
+      }
+
+      // Invalidate events query
+      queryClient.invalidateQueries({ queryKey: ["events"] })
 
       toast({
         title: "Success",
         description: "Event created successfully!",
       });
       form.reset();
-      //setOpen(false)
       router.push("/events");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating event:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to create event. Please try again.",
+        description: `Failed to create event: ${error.message || "Unknown error"}`,
       });
     }
   }
